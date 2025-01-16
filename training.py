@@ -23,10 +23,10 @@ from general_utils import TrainingLogger, get_attribute, filter_args, log, train
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-def dice_loss(pred, target, smooth=1):
+def dice_loss(pred, target):
     pred = torch.sigmoid(pred)
     intersection = (pred * target).sum()
-    return 1 - (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
+    return 1 - (2. * intersection + 1) / (pred.sum() + target.sum() + 1)
 
 
 def cosine_warmup_lr(i, warmup=10, max_iter=90):
