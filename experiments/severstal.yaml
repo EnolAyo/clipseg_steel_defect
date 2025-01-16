@@ -8,12 +8,13 @@ configuration:
   scorer: experiment_setup.score
   model: models.clipseg.CLIPDensePredT
 
-  lr_scheduler: cosine
+  #lr_scheduler: cosine
+  lr_scheduler: None
   T_max: 20000
   eta_min: 0.0001
 
-  max_iterations: 20000
-  val_interval: 500
+  max_iterations: 1000
+  val_interval: 100
   val_max_iterations: 256
 
   # dataset
@@ -76,7 +77,7 @@ train_loss, duration, date
 
 individual_configurations:
 
-- {name: rd64-7K-vit16-cbh-coco-notebooks-5classes_no_neg, version: 'ViT-B/16',negative_prob: 0, reduce_dim: 64, mask: text_and_blur3_highlight01, T_max: 10000, max_iterations: 10000}
+- {name: rd64-7K-vit16-cbh-coco-notebooks-5classes_no_neg, version: 'ViT-B/16',negative_prob: 0, reduce_dim: 64, mask: text_and_crop_blur_highlight256, T_max: 5000, max_iterations: 5000}
 - {name: rd64-7K-vit16-cbh-coco-0, version: 'ViT-B/16', fold: 0, reduce_dim: 64, mask: text_and_crop_blur_highlight352, T_max: 7000, max_iterations: 7000}
 - {name: rd64-7K-vit16-cbh-coco-1, version: 'ViT-B/16', fold: 1, reduce_dim: 64, mask: text_and_crop_blur_highlight352, T_max: 7000, max_iterations: 7000}
 - {name: rd64-7K-vit16-cbh-coco-2, version: 'ViT-B/16', fold: 2, reduce_dim: 64, mask: text_and_crop_blur_highlight352, T_max: 7000, max_iterations: 7000}

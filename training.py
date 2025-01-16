@@ -5,6 +5,7 @@ import yaml
 import math
 import os
 import sys
+from  datetime import datetime
 
 from general_utils import log
 
@@ -81,6 +82,8 @@ def validate(model, dataset, config):
 
 
 def main():
+
+    log_tensorboard = os.path.join("logs_tb", datetime.now().strftime("%Y%m%d-%H%M%S"))
 
     config = training_config_from_cli_args()
 
@@ -165,6 +168,7 @@ def main():
                             # when mask=='separate'
                             visual_s_cond, _, _ = model.visual_forward_masked(data_x[2].cuda(), data_x[3].cuda())
                         else:
+                            # OUR CASE
                             # data_x[2] = visual prompt
                             visual_s_cond, _, _ = model.visual_forward(data_x[2].cuda())
 
@@ -180,7 +184,7 @@ def main():
                         visual_is_valid = data_x[4] if model.__class__.__name__ == 'CLIPDensePredTMasked' else data_x[3]
                         text_weights = torch.max(text_weights[:,0], 1 - visual_is_valid.float().cuda()).unsqueeze(1)
 
-                    cond = text_cond * text_weights + visual_s_cond * (1 - text_weights)
+                    cond = text_cond * text_weights + visual_s_cond * (1 - text_weights) # VECTOR DE CONDICIONAMIENTO
 
                 else:
                     # no mix
@@ -201,6 +205,8 @@ def main():
                     pred, visual_q, _, _  = model(data_x[0].cuda(), cond, return_features=True)
 
                     loss = loss_fn(pred, data_y[0].cuda()) + dice_loss(pred, data_y[0].cuda())
+                    writer.add_scalar('loss_train', loss, i)
+
 
                     if torch.isnan(loss) or torch.isinf(loss):
                         # skip if loss is nan
@@ -245,7 +251,8 @@ def main():
                 if val_interval is not None and i % val_interval == val_interval - 1:
 
                     val_loss, val_scores, maximize = validate(model, dataset_val, config)
-                    
+                    writer.add_scalar('loss_val', val_loss, i)
+                    writer.flush()
                     if len(val_scores) > 0:
 
                         score_str = f', scores: ' + ', '.join(f'{k}: {v}' for k, v in val_scores.items())
@@ -268,6 +275,7 @@ def main():
                     log.info(f'Validation loss: {val_loss}' + score_str)
                     logger.iter(i=i, val_loss=val_loss, extra_loss=float(extra_loss), **val_scores)
                     model.train()
+
 
             print('epoch complete')
 
