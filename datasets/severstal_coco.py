@@ -117,9 +117,9 @@ class DatasetCOCO(Dataset):
             query_id = query['id']
             org_qry_imsize = query_img.size
             query_mask = self.read_mask(query['segmentation'])
+
             support_class = query_class if query_class in [1, 2, 3, 4] else random.randint(1, 4)
             support_id = query_id
-            random.seed(33)
             while query_id == support_id:
                 support_id = random.choice(self.ids_by_class[support_class])
             support = metadata.loadAnns(ids=support_id)[0]

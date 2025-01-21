@@ -1,10 +1,11 @@
 from models.clipseg import CLIPDensePredT
 from datasets.severstal import COCOWrapper
 from tqdm import tqdm
-
-
+import random
+import numpy as np
 
 def evaluate(model, dataset, text_weights = 0.5):
+    random.seed(33)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=False)
     score = [[], [], [], [], []]
     model.eval()
@@ -26,15 +27,17 @@ def evaluate(model, dataset, text_weights = 0.5):
             preds, visual_q, _, _  = model(data_x[0], cond, return_features=True)
 
 
-            new_score = get_score(preds, data_y[0], data_y[2])
+            new_score = get_score(preds, data_y[0], labels)
             for i, class_score in enumerate(score):
                 if new_score[i] is not None:
                     score[i] += new_score[i]
-
+    acc = []
     for i, class_score in enumerate(score):
+        non_zero = sum(1 for x in class_score if x > 0)
+        acc.append(non_zero / len(class_score))
         score[i] = sum(class_score) / len(class_score)
         print(len(class_score))
-    return score
+    return score, acc
 
 import torch
 
@@ -69,10 +72,6 @@ def get_score(pred, target, query_class, threshold=0.5, eps=1e-6):
 
 
 
-
-
-
-
 def main():
     model = CLIPDensePredT(version='ViT-B/16', reduce_dim=64)
     weights = '/home/eas/Enol/pycharm_projects/clipseg_steel_defect/logs/rd64-7K-vit16-cbh-coco-notebooks-5classes_no_neg/weights.pth'
@@ -80,10 +79,13 @@ def main():
     model.load_state_dict(torch.load(weights, map_location=torch.device('cpu')), strict=False);
     dataset = COCOWrapper(split='test')
     model.cuda()
-    score = evaluate(model, dataset, text_weights=0)
-    print(score)
-    score = evaluate(model, dataset, text_weights=1)
-    print(score)
+    text_weights = np.linspace(1, 0, 11)
+    for text_weight in text_weights:
+        score, acc = evaluate(model, dataset, text_weights=text_weight)
+        print(f'Results for text weight: {text_weight}')
+        print(f'DICE coeff.: {score}')
+        print(f'Ratio of found defects: {acc}')
+
     """
     for i in range(1,5):
         print(f'Dice Coefficient for class {i}: {sum(results[i])/len(results[i])}')
