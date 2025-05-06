@@ -64,7 +64,7 @@ class FewShotSegmentationDataset(Dataset):
         support_images = []
         support_masks = []
 
-        for cat_id in self.category_ids:
+        for cat_id in self.category_ids[:-1]:
             support_ids = list(set(self.split_class_to_image_ids[cat_id]) - {query_image_id})
             if not support_ids:
                 continue
