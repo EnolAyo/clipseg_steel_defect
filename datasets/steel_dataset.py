@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from pycocotools.coco import COCO
 from pycocotools import mask as mask_utils
 
-class FewShotSegmentationDataset(Dataset):
+class SeverstalDataset(Dataset):
     def __init__(self, json_path, image_dir, image_size=(256, 256), n_support=1,
                  transform=None, split='train', split_ratio=0.8, seed=42):
         self.coco = COCO(json_path)

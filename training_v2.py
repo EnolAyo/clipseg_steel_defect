@@ -6,9 +6,9 @@ import math
 import os
 import sys
 from datetime import datetime
-
+from datasets.steel_dataset import SeverstalDataset
 from general_utils import log
-
+from torchvision import transforms
 import numpy as np
 from functools import partial
 from os.path import expanduser, join, isfile, basename
@@ -89,15 +89,23 @@ def main():
     _, dataset_args, _ = filter_args(config, inspect.signature(dataset_cls).parameters)
 
     dataset = dataset_cls(**dataset_args)
+    json_path = './Severstal/annotations_COCO.json'
+    images_path = './Severstal/train_subimages'
+    mean = [0.34388125, 0.34388125, 0.34388125]
+    std = [0.13965334, 0.13965334, 0.13965334]
+    image_size = 256
+    transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
+    ])
+    train_dataset = SeverstalDataset(json_path=json_path, images_path=images_path, image_size=(256,256),
+                               n_support=1, transform=transform, split='train')
+    val_dataset = SeverstalDataset(json_path=json_path, images_path=images_path, image_size=(256,256),
+                               n_support=1, transform=transform, split='val')
+    log.info(f'Train dataset {train_dataset.__class__.__name__} (length: {len(dataset)})')
 
-    log.info(f'Train dataset {dataset.__class__.__name__} (length: {len(dataset)})')
 
-    if val_interval is not None:
-        dataset_val_args = {k[4:]: v for k, v in config.items() if k.startswith('val_') and k != 'val_interval'}
-        _, dataset_val_args, _ = filter_args(dataset_val_args, inspect.signature(dataset_cls).parameters)
-        print('val args', {**dataset_args, **{'split': 'val', 'aug': 0}, **dataset_val_args})
-
-        dataset_val = dataset_cls(**{**dataset_args, **{'split': 'val', 'aug': 0}, **dataset_val_args})
 
     # optimizer
     opt_cls = get_attribute(config.optimizer)

@@ -18,7 +18,7 @@ configuration:
   val_max_iterations: 256
 
   # dataset
-  dataset: datasets.Severstal.COCOWrapper
+  dataset: datasets.Severstal.steel_dataset
   # split_mode: pascal_test
   split: train
   mask: text_and_blur3_highlight01
