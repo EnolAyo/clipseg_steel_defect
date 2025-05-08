@@ -6,6 +6,15 @@ from PIL import Image
 from torch.utils.data import Dataset
 from pycocotools.coco import COCO
 from pycocotools import mask as mask_utils
+from datasets.utils import blend_image_segmentation
+
+
+defects_description = {
+                       1: 'network of fine, hairline cracks or fissures on the surface of the steel',
+                       2: 'scale—oxides embedded into the steel plate',
+                       3: 'shallow, narrow grooves or lines on the surface of the steel',
+                       4: 'impurity or foreign material embedded within the steel matrix'
+                       }
 
 class SeverstalDataset(Dataset):
     def __init__(self, json_path, image_dir, image_size=(256, 256), n_support=1,
@@ -61,8 +70,7 @@ class SeverstalDataset(Dataset):
         query_image_id = random.choice(query_images)
         query_img, query_mask = self.load_image_and_mask(query_image_id, query_class)
 
-        support_images = []
-        support_masks = []
+        support = []
 
         for cat_id in self.category_ids[:-1]:
             support_ids = list(set(self.split_class_to_image_ids[cat_id]) - {query_image_id})
@@ -72,14 +80,14 @@ class SeverstalDataset(Dataset):
 
             for sid in chosen_ids:
                 img, mask = self.load_image_and_mask(sid, cat_id)
-                support_images.append(img)
-                support_masks.append(mask)
+                supp = [defects_description[cat_id]] + blend_image_segmentation(img, mask,
+                                                                              mode='blur3_highlight01')
+                support.append(torch.tensor(supp))
 
         return {
             'query_image': query_img,
             'query_mask': query_mask,
-            'support_images': torch.stack(support_images),
-            'support_masks': torch.stack(support_masks),
+            'support': torch.stack(support),
             'query_class': torch.tensor(query_class, dtype=torch.long)
         }
 
@@ -97,15 +105,11 @@ class SeverstalDataset(Dataset):
             m = Image.fromarray(m).resize(self.image_size, resample=Image.NEAREST)
             mask = np.maximum(mask, np.array(m))
 
-        image = np.array(image).transpose(2, 0, 1) / 255.0  # CHW
-        mask = mask.astype(np.float32)[None, :, :]         # 1CHW
-
+        mask = torch.tensor(mask, dtype=torch.float32)
         if self.transform:
-            image = self.transform(torch.tensor(image, dtype=torch.float32))
-            mask = self.transform(torch.tensor(mask, dtype=torch.float32))
+            image = self.transform(image)
         else:
             image = torch.tensor(image, dtype=torch.float32)
-            mask = torch.tensor(mask, dtype=torch.float32)
 
         return image, mask
 

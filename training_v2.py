@@ -191,11 +191,7 @@ def main():
                     scaler.step(opt)
                     scaler.update()
 
-                if lr_scheduler is not None:
-                    lr_scheduler.step()
-                    if i % 2000 == 0:
-                        current_lr = [g['lr'] for g in opt.param_groups][0]
-                        log.info(f'current lr: {current_lr:.5f} ({len(opt.param_groups)} parameter groups)')
+
 
                 logger.iter(i=i, loss=loss)
                 i += 1
