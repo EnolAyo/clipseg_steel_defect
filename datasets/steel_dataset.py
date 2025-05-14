@@ -9,12 +9,6 @@ from pycocotools import mask as mask_utils
 from datasets.utils import blend_image_segmentation
 
 
-defects_description = {
-                       1: 'network of fine, hairline cracks or fissures on the surface of the steel',
-                       2: 'scale—oxides embedded into the steel plate',
-                       3: 'shallow, narrow grooves or lines on the surface of the steel',
-                       4: 'impurity or foreign material embedded within the steel matrix'
-                       }
 
 class SeverstalDataset(Dataset):
     def __init__(self, json_path, image_dir, image_size=(256, 256), n_support=1,
@@ -69,26 +63,25 @@ class SeverstalDataset(Dataset):
 
         query_image_id = random.choice(query_images)
         query_img, query_mask = self.load_image_and_mask(query_image_id, query_class)
+        support = {1: [], 2: [], 3: [], 4: []}
 
-        support = []
 
         for cat_id in self.category_ids[:-1]:
             support_ids = list(set(self.split_class_to_image_ids[cat_id]) - {query_image_id})
             if not support_ids:
                 continue
-            chosen_ids = random.sample(support_ids, k=min(self.n_support, len(support_ids)))
+            chosen_ids = random.sample(support_ids, k=self.n_support)
 
             for sid in chosen_ids:
                 img, mask = self.load_image_and_mask(sid, cat_id)
-                supp = [defects_description[cat_id]] + blend_image_segmentation(img, mask,
-                                                                              mode='blur3_highlight01')
-                support.append(torch.tensor(supp))
+                supp = blend_image_segmentation(img, mask, mode='blur3_highlight01')[0]
+                support[cat_id].append(torch.tensor(supp))
 
         return {
-            'query_image': query_img,
-            'query_mask': query_mask,
-            'support': torch.stack(support),
-            'query_class': torch.tensor(query_class, dtype=torch.long)
+            'query_image': query_img, #Tensor
+            'query_mask': query_mask, #Tensor
+            'support': support, #dictionary with lists of tensors per each class(index)
+            'query_class': torch.tensor(query_class, dtype=torch.long) #Tensor
         }
 
     def load_image_and_mask(self, image_id, category_id):
@@ -101,9 +94,11 @@ class SeverstalDataset(Dataset):
         mask = np.zeros(self.image_size, dtype=np.uint8)
 
         for ann in anns:
+            cat_id = ann['category_id']
             m = mask_utils.decode(ann['segmentation'])
             m = Image.fromarray(m).resize(self.image_size, resample=Image.NEAREST)
-            mask = np.maximum(mask, np.array(m))
+            m = np.array(m, dtype=np.uint8)
+            mask[m > 0] = cat_id  # Set class ID where mask is non-zero
 
         mask = torch.tensor(mask, dtype=torch.float32)
         if self.transform:

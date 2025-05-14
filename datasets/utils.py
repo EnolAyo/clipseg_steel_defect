@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 
-def blend_image_segmentation(img, seg, mode, image_size=224):
+def blend_image_segmentation(img, seg, mode, image_size=224) -> list:
 
 
     if mode in {'blur_highlight', 'blur3_highlight', 'blur3_highlight01', 'blur_highlight_random', 'crop'}:
