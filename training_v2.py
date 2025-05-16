@@ -1,19 +1,12 @@
 import torch
-import os
-import sys
-from datetime import datetime
-import inspect
 from datasets.steel_dataset import SeverstalDataset
-from general_utils import log
 from torchvision import transforms
-from os.path import join, isfile
 from torch.utils.data import DataLoader
 from map_fusion_network import MapFusion
 from models.clipseg import CLIPDensePredT
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import torch.optim as optim
-from general_utils import filter_args
 
 
 def read_yaml(filepath: str) -> dict:
@@ -41,6 +34,7 @@ def main():
                                n_support=n_support, transform=transform, split='train')
     val_dataset = SeverstalDataset(json_path=json_path, image_dir=image_dir, image_size=(256,256),
                                n_support=n_support, transform=transform, split='val')
+    val_interval = config['training']['val_interval']
 
     model_params = config['model_config']
     lr = config['training']['lr']
@@ -52,20 +46,49 @@ def main():
     optimizer = optim.AdamW(fusion_model.parameters(), lr=lr)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    data_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=4)
-
-    for batch in data_loader:
-
+    train_data_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
+    val_data_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
+    episode = 0
+    writer = SummaryWriter(log_dir='./logs/severstal')
+    for batch in train_data_loader:
+        fusion_model.train()
         query_image = batch['query_image'].cuda()
         mask = batch['query_mask'].cuda()
         support = batch['support']
-        query_class = batch['query_class'].cuda()
+        #query_class = batch['query_class'].cuda()
 
         optimizer.zero_grad()
         result = fusion_model.forward(query_image, support).squeeze(1).squeeze(1)
         loss = loss_fn(result, mask)
         loss.backward()
         optimizer.step()
+
+        # Log and print training loss
+        writer.add_scalar("loss/train", loss.item(), episode)
+        print(f"[Episode {episode}] Train Loss: {loss.item():.4f}")
+
+        # Validate
+        fusion_model.eval()
+        with torch.no_grad():
+            val_loss_total = 0
+            val_batches = 0
+            val_episode = 0
+            if episode % val_interval == 0:
+                for val_batch in val_data_loader:
+                    val_query = val_batch['query_image'].cuda()
+                    val_mask = val_batch['query_mask'].cuda()
+                    val_support = val_batch['support']
+                    val_output = fusion_model(val_query, val_support).squeeze(1).squeeze(1)
+                    val_loss = loss_fn(val_output, val_mask)
+                    val_loss_total += val_loss.item()
+                    val_batches += 1
+                    val_episode += 1
+                    if val_episode > 1000:
+                        break
+                avg_val_loss = val_loss_total / val_batches
+                writer.add_scalar("loss/val", avg_val_loss, episode)
+                print(f"[Episode {episode}] Validation Loss: {avg_val_loss:.4f}")
+        episode += 1
 
 
 if __name__ == '__main__':
