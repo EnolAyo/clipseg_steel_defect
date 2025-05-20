@@ -7,6 +7,8 @@ from models.clipseg import CLIPDensePredT
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 import torch.optim as optim
+import os
+
 
 
 def read_yaml(filepath: str) -> dict:
@@ -14,7 +16,7 @@ def read_yaml(filepath: str) -> dict:
         return yaml.safe_load(file)
 
 def main():
-
+    os.makedirs('./weights/severstal', exist_ok=True)
     json_path = './Severstal/annotations_COCO.json'
     image_dir = './Severstal/train_subimages'
     config_path = './experiments/severstal.yaml'
@@ -27,6 +29,8 @@ def main():
         transforms.Normalize(mean, std)
     ])
     config = read_yaml(config_path)
+
+    max_epochs = 50
 
     n_support = config['training']['n_support']
 
@@ -48,24 +52,25 @@ def main():
 
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
     val_data_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
-    episode = 0
+    epoch = 0
     writer = SummaryWriter(log_dir='./logs/severstal')
-    for batch in train_data_loader:
-        fusion_model.train()
-        query_image = batch['query_image'].cuda()
-        mask = batch['query_mask'].cuda()
-        support = batch['support']
-        #query_class = batch['query_class'].cuda()
+    while epoch < max_epochs:
+        for batch in train_data_loader:
+            fusion_model.train()
+            query_image = batch['query_image'].cuda()
+            mask = batch['query_mask'].cuda()
+            support = batch['support']
+            #query_class = batch['query_class'].cuda()
 
-        optimizer.zero_grad()
-        result = fusion_model.forward(query_image, support).squeeze(1).squeeze(1)
-        loss = loss_fn(result, mask)
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            result = fusion_model.forward(query_image, support)
+            loss = loss_fn(result, mask)
+            loss.backward()
+            optimizer.step()
 
         # Log and print training loss
-        writer.add_scalar("loss/train", loss.item(), episode)
-        print(f"[Episode {episode}] Train Loss: {loss.item():.4f}")
+        writer.add_scalar("loss/train", loss.item(), epoch)
+        print(f"[Epoch {epoch}] Train Loss: {loss.item():.4f}")
 
         # Validate
         fusion_model.eval()
@@ -73,7 +78,7 @@ def main():
             val_loss_total = 0
             val_batches = 0
             val_episode = 0
-            if episode % val_interval == 0:
+            if epoch % val_interval == 0:
                 for val_batch in val_data_loader:
                     val_query = val_batch['query_image'].cuda()
                     val_mask = val_batch['query_mask'].cuda()
@@ -86,9 +91,11 @@ def main():
                     if val_episode > 1000:
                         break
                 avg_val_loss = val_loss_total / val_batches
-                writer.add_scalar("loss/val", avg_val_loss, episode)
-                print(f"[Episode {episode}] Validation Loss: {avg_val_loss:.4f}")
-        episode += 1
+                writer.add_scalar("loss/val", avg_val_loss, epoch)
+                print(f"[Episode {epoch}] Validation Loss: {avg_val_loss:.4f}")
+
+            torch.save(fusion_model.state_dict(), f'./checkpoints/fusion_model_epoch_{epoch}.pth')
+            epoch += 1
 
 
 if __name__ == '__main__':

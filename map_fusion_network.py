@@ -11,17 +11,19 @@ class MapFusion(nn.Module):
         super().__init__()
         self.clipseg_model = clipseg_model
 
+        """
         self.fusion_net = nn.Sequential(
             nn.Conv3d(1, 4,kernel_size=(4, 3, 3), padding=(0, 1, 1)),
             nn.ReLU(),
             nn.Conv3d(4, 1, kernel_size=1)
         )
+        """
 
     def forward(self, query_image, support_sets):  # support_sets: dict {class_id: [(img, mask), ...]}
-        prob_maps = []
+        logit_maps = []
         for class_id, support in support_sets.items():
             # Combine support images and masks if needed (e.g., average over shots)
-            pred_prob = []
+            output_maps = []
             text_prompt = defects_description[class_id]
             text_weights = torch.rand(1).cuda()
             text_cond = self.clipseg_model.compute_conditional(text_prompt)
@@ -29,11 +31,10 @@ class MapFusion(nn.Module):
                 visual_s_cond, _, _ = self.clipseg_model.visual_forward(visual_prompt.cuda())
                 cond_vector = text_cond * text_weights + visual_s_cond * (1 - text_weights)
                 pred_logit, _, _, _ = self.clipseg_model(query_image.cuda(), cond_vector, return_features=True)
-                pred_prob.append(torch.sigmoid(pred_logit))
-            avg_prob = torch.stack(pred_prob).mean(dim=0)
-            prob_maps.append(avg_prob)
+                output_maps.append(pred_logit)
+            avg_logits_per_class = torch.stack(output_maps).mean(dim=0)
+            logit_maps.append(avg_logits_per_class)
+            fused_map = torch.cat(logit_maps, dim=1)
+            predicted_mask = torch.argmax(fused_map, dim=1).to(torch.float32)
 
-        probs_stacked = torch.stack(prob_maps, dim=1)  # [B, K, H, W]
-        probs_stacked = probs_stacked.permute(0, 2, 1, 3, 4)
-        fused_probs = self.fusion_net(probs_stacked)   # [B, K, H, W]
-        return fused_probs
+        return predicted_mask
