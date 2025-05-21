@@ -44,11 +44,18 @@ def main():
     lr = config['training']['lr']
     batch_size = config['training']['batch_size']
 
-    clipseg_model = CLIPDensePredT(**model_params).cuda()
-    fusion_model = MapFusion(num_classes=4, clipseg_model=clipseg_model).cuda()
+    clipseg_model_class_1 = CLIPDensePredT(**model_params).cuda()
+    clipseg_model_class_2 = CLIPDensePredT(**model_params).cuda()
+    clipseg_model_class_3 = CLIPDensePredT(**model_params).cuda()
+    clipseg_model_class_4 = CLIPDensePredT(**model_params).cuda()
+
+    fusion_model = MapFusion(num_classes=4, clipseg_model_class_1=clipseg_model_class_1,
+                             clipseg_model_class_2=clipseg_model_class_2,
+                             clipseg_model_class_3=clipseg_model_class_3,
+                             clipseg_model_class_4=clipseg_model_class_4).cuda()
     # optimizer
     optimizer = optim.AdamW(fusion_model.parameters(), lr=lr)
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=254)
 
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
     val_data_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
@@ -64,7 +71,12 @@ def main():
 
             optimizer.zero_grad()
             result = fusion_model.forward(query_image, support)
-            loss = loss_fn(result, mask)
+            mask_shifted = mask.clone()
+            mask_shifted[mask_shifted == 0] = 255  # mark background as ignore
+            mask_shifted -= 1
+            mask_shifted = mask_shifted.long()
+
+            loss = loss_fn(result, mask_shifted)
             loss.backward()
             optimizer.step()
 
@@ -83,8 +95,12 @@ def main():
                     val_query = val_batch['query_image'].cuda()
                     val_mask = val_batch['query_mask'].cuda()
                     val_support = val_batch['support']
-                    val_output = fusion_model(val_query, val_support).squeeze(1).squeeze(1)
-                    val_loss = loss_fn(val_output, val_mask)
+                    val_output = fusion_model(val_query, val_support)
+                    mask_shifted = val_mask.clone()
+                    mask_shifted[mask_shifted == 0] = 255  # mark background as ignore
+                    mask_shifted -= 1
+                    mask_shifted = mask_shifted.long()
+                    val_loss = loss_fn(val_output, mask_shifted)
                     val_loss_total += val_loss.item()
                     val_batches += 1
                     val_episode += 1
@@ -92,7 +108,7 @@ def main():
                         break
                 avg_val_loss = val_loss_total / val_batches
                 writer.add_scalar("loss/val", avg_val_loss, epoch)
-                print(f"[Episode {epoch}] Validation Loss: {avg_val_loss:.4f}")
+                print(f"[Epoch {epoch}] Validation Loss: {avg_val_loss:.4f}")
 
             torch.save(fusion_model.state_dict(), f'./checkpoints/fusion_model_epoch_{epoch}.pth')
             epoch += 1

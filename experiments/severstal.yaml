@@ -1,5 +1,5 @@
 training:
-  batch_size: 16
+  batch_size: 4
   optimizer: torch.optim.AdamW
   lr: 0.001
   clipseg_model: models.clipseg.CLIPDensePredT
