@@ -10,7 +10,6 @@ import torch.optim as optim
 import os
 
 
-
 def read_yaml(filepath: str) -> dict:
     with open(filepath, "r") as file:
         return yaml.safe_load(file)
