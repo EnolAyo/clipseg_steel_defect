@@ -1,11 +1,11 @@
 training:
-  batch_size: 4
+  batch_size: 16
   optimizer: torch.optim.AdamW
   lr: 0.001
   clipseg_model: models.clipseg.CLIPDensePredT
   fusion_model: map_fusion_network.MapFusion
   max_iterations: 10000
-  val_interval: 10
+  val_interval: 5
   loss_function: torch.nn.functional.binary_cross_entropy_with_logits
   n_support: 2
 

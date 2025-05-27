@@ -1,5 +1,7 @@
 import os
 import random
+from os.path import split
+
 import torch
 import numpy as np
 from PIL import Image
@@ -53,7 +55,10 @@ class SeverstalDataset(Dataset):
         return split_map
 
     def __len__(self):
-        return 10000  # Random sampling
+        if split == 'train':
+            return 10000  # Random sampling
+        else:
+            return 500
 
     def __getitem__(self, idx):
         query_class = random.choice(self.category_ids)

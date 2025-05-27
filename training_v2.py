@@ -30,7 +30,7 @@ def main():
     ])
     config = read_yaml(config_path)
 
-    max_epochs = 50
+    max_epochs = 100
 
     n_support = config['training']['n_support']
 
@@ -61,7 +61,9 @@ def main():
     val_data_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
     epoch = 0
     writer = SummaryWriter(log_dir='./logs/severstal')
-    while epoch < max_epochs:
+    while epoch <= max_epochs:
+        n_batch = 0
+        epoch_loss = 0
         for batch in train_data_loader:
             fusion_model.train()
             query_image = batch['query_image'].cuda()
@@ -79,17 +81,19 @@ def main():
             loss = loss_fn(result, mask_shifted)
             loss.backward()
             optimizer.step()
+            epoch_loss += loss.item()
+            n_batch += 1
 
         # Log and print training loss
-        writer.add_scalar("loss/train", loss.item(), epoch)
-        print(f"[Epoch {epoch}] Train Loss: {loss.item():.4f}")
+        epoch_loss /= n_batch
+        writer.add_scalar("loss/train", epoch_loss, epoch)
+        print(f"[Epoch {epoch}] Train Loss: {epoch_loss:.4f}")
 
         # Validate
         fusion_model.eval()
         with torch.no_grad():
             val_loss_total = 0
             val_batches = 0
-            val_episode = 0
             if epoch % val_interval == 0:
                 for val_batch in val_data_loader:
                     val_query = val_batch['query_image'].cuda()
@@ -103,14 +107,12 @@ def main():
                     val_loss = loss_fn(val_output, mask_shifted)
                     val_loss_total += val_loss.item()
                     val_batches += 1
-                    val_episode += 1
-                    if val_episode > 1000:
-                        break
+
                 avg_val_loss = val_loss_total / val_batches
                 writer.add_scalar("loss/val", avg_val_loss, epoch)
                 print(f"[Epoch {epoch}] Validation Loss: {avg_val_loss:.4f}")
 
-            torch.save(fusion_model.state_dict(), f'./checkpoints/fusion_model_epoch_{epoch}.pth')
+            torch.save(fusion_model.state_dict(), f'./weights/severstal/fusion_model_epoch_{epoch}.pth')
             epoch += 1
 
 
