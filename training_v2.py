@@ -43,18 +43,12 @@ def main():
     lr = config['training']['lr']
     batch_size = config['training']['batch_size']
 
-    clipseg_model_class_1 = CLIPDensePredT(**model_params).cuda()
-    clipseg_model_class_2 = CLIPDensePredT(**model_params).cuda()
-    clipseg_model_class_3 = CLIPDensePredT(**model_params).cuda()
-    clipseg_model_class_4 = CLIPDensePredT(**model_params).cuda()
+    clipseg_model = CLIPDensePredT(**model_params).cuda()
 
-    fusion_model = MapFusion(num_classes=4, clipseg_model_class_1=clipseg_model_class_1,
-                             clipseg_model_class_2=clipseg_model_class_2,
-                             clipseg_model_class_3=clipseg_model_class_3,
-                             clipseg_model_class_4=clipseg_model_class_4).cuda()
+    fusion_model = MapFusion(num_classes=5, clipseg_model=clipseg_model).cuda()
     # optimizer
     optimizer = optim.AdamW(fusion_model.parameters(), lr=lr)
-    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=254)
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
     val_data_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=4, shuffle=True)
@@ -66,18 +60,14 @@ def main():
         for batch in train_data_loader:
             fusion_model.train()
             query_image = batch['query_image'].cuda()
-            mask = batch['query_mask'].cuda()
+            mask = batch['query_mask'].long().cuda()
             support = batch['support']
             #query_class = batch['query_class'].cuda()
 
             optimizer.zero_grad()
             result = fusion_model.forward(query_image, support)
-            mask_shifted = mask.clone()
-            mask_shifted[mask_shifted == 0] = 255  # mark background as ignore
-            mask_shifted -= 1
-            mask_shifted = mask_shifted.long()
 
-            loss = loss_fn(result, mask_shifted)
+            loss = loss_fn(result, mask)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -96,14 +86,11 @@ def main():
             if epoch % val_interval == 0:
                 for val_batch in val_data_loader:
                     val_query = val_batch['query_image'].cuda()
-                    val_mask = val_batch['query_mask'].cuda()
+                    val_mask = val_batch['query_mask'].long().cuda()
                     val_support = val_batch['support']
                     val_output = fusion_model(val_query, val_support)
-                    mask_shifted = val_mask.clone()
-                    mask_shifted[mask_shifted == 0] = 255  # mark background as ignore
-                    mask_shifted -= 1
-                    mask_shifted = mask_shifted.long()
-                    val_loss = loss_fn(val_output, mask_shifted)
+
+                    val_loss = loss_fn(val_output, val_mask)
                     val_loss_total += val_loss.item()
                     val_batches += 1
 

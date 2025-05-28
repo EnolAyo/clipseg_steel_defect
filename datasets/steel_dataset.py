@@ -47,31 +47,35 @@ class SeverstalDataset(Dataset):
             split_idx = int(len(img_ids) * self.split_ratio)
             if self.split == 'train':
                 split_map[class_id] = img_ids[:split_idx]
-            elif self.split == 'val':
+            elif self.split in ['val', 'test']:
                 split_map[class_id] = img_ids[split_idx:]
             else:
-                raise ValueError("split must be 'train' or 'val'")
+                raise ValueError("split must be 'train', 'val' or 'test'")
 
         return split_map
 
     def __len__(self):
-        if split == 'train':
+        if self.split == 'train':
             return 10000  # Random sampling
-        else:
+        elif self.split == 'val':
             return 500
+        else:
+            return sum(len(img_ids) for img_ids in self.split_class_to_image_ids.values())
 
     def __getitem__(self, idx):
-        query_class = random.choice(self.category_ids)
-        query_images = self.split_class_to_image_ids[query_class]
-        if not query_images:
-            return self.__getitem__(idx)  # Retry if no data for class in split
+        if self.split in ['train', 'val']:
+            query_class = random.choice(self.category_ids)
+            query_images = self.split_class_to_image_ids[query_class]
+            if not query_images:
+                return self.__getitem__(idx)  # Retry if no data for class in split
+            query_image_id = random.choice(query_images)
+        else:
+            query_image_id = list(self.split_class_to_image_ids.values())[idx]
 
-        query_image_id = random.choice(query_images)
-        query_img, query_mask = self.load_image_and_mask(query_image_id, query_class)
-        support = {1: [], 2: [], 3: [], 4: []}
+        query_img, query_mask = self.load_image_and_mask(query_image_id, cat_ids=[1,2,3,4])
+        support = {0: [], 1: [], 2: [], 3: [], 4: []}
 
-
-        for cat_id in self.category_ids[:-1]:
+        for cat_id in self.category_ids:
             support_ids = list(set(self.split_class_to_image_ids[cat_id]) - {query_image_id})
             if not support_ids:
                 continue
@@ -79,22 +83,24 @@ class SeverstalDataset(Dataset):
 
             for sid in chosen_ids:
                 img, mask = self.load_image_and_mask(sid, cat_id)
+                if cat_id == 0:
+                    mask = torch.tensor(np.ones(self.image_size, dtype=np.uint8), dtype=torch.float32)
+                else:
+                    mask = (mask != 0).float()
                 supp = blend_image_segmentation(img, mask, mode='blur3_highlight01')[0]
                 support[cat_id].append(torch.tensor(supp))
 
         return {
             'query_image': query_img, #Tensor
             'query_mask': query_mask, #Tensor
-            'support': support, #dictionary with lists of tensors per each class(index)
-            'query_class': torch.tensor(query_class, dtype=torch.long) #Tensor
+            'support': support #dictionary with lists of tensors per each class(index)
         }
 
-    def load_image_and_mask(self, image_id, category_id):
+    def load_image_and_mask(self, image_id, cat_ids):
         img_info = self.coco.loadImgs(image_id)[0]
         img_path = os.path.join(self.image_dir, img_info['file_name'])
         image = Image.open(img_path).convert('RGB').resize(self.image_size)
-
-        ann_ids = self.coco.getAnnIds(imgIds=image_id, catIds=category_id)
+        ann_ids = self.coco.getAnnIds(imgIds=image_id, catIds=cat_ids)
         anns = self.coco.loadAnns(ann_ids)
         mask = np.zeros(self.image_size, dtype=np.uint8)
 
