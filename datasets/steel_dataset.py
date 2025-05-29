@@ -70,13 +70,17 @@ class SeverstalDataset(Dataset):
                 return self.__getitem__(idx)  # Retry if no data for class in split
             query_image_id = random.choice(query_images)
         else:
-            query_image_id = list(self.split_class_to_image_ids.values())[idx]
+            all_image_ids = [img_id for img_list in self.split_class_to_image_ids.values() for img_id in img_list]
+            query_image_id = all_image_ids[idx]
 
         query_img, query_mask = self.load_image_and_mask(query_image_id, cat_ids=[1,2,3,4])
         support = {0: [], 1: [], 2: [], 3: [], 4: []}
 
         for cat_id in self.category_ids:
+
             support_ids = list(set(self.split_class_to_image_ids[cat_id]) - {query_image_id})
+
+
             if not support_ids:
                 continue
             chosen_ids = random.sample(support_ids, k=self.n_support)
