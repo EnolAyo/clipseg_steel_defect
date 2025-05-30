@@ -14,11 +14,11 @@ class MapFusion(nn.Module):
 
 
         self.fusion_net = nn.Sequential(
-            nn.Conv2d(num_classes, 32, kernel_size=3, padding=1),
+            nn.Conv2d(num_classes, 32, kernel_size=7, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
 
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.Conv2d(32, 64, kernel_size=7, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.Conv2d(64, num_classes, kernel_size=1)
