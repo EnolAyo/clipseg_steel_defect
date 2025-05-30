@@ -43,8 +43,7 @@ def main():
     # ------------------------
     # Evaluation
     # ------------------------
-    all_preds = []
-    all_gts = []
+    conf_mat_total = np.zeros((num_classes, num_classes), dtype=np.int64)
     with torch.no_grad():
 
         for batch in tqdm(test_data_loader, desc='Evaluating'):
@@ -55,50 +54,60 @@ def main():
             result = model.forward(query_image, support)
             preds = torch.argmax(result, dim=1)  # shape: [B, H, W]
 
-            # Store predictions and labels for further analysis if needed
-            # Store flattened predictions and labels
-            all_preds.append(preds.view(-1).cpu().numpy())
-            all_gts.append(mask.view(-1).cpu().numpy())
+            # Flatten predictions and labels
+            preds_np = preds.view(-1).cpu().numpy()
+            mask_np = mask.view(-1).cpu().numpy()
 
+            # Update confusion matrix
+            conf_mat_batch = confusion_matrix(mask_np, preds_np, labels=list(range(num_classes)))
+            conf_mat_total += conf_mat_batch
 
 
 
     # ------------------------
     # Final Results
     # ------------------------
-    y_pred = np.concatenate(all_preds)  # shape: [total_pixels]
-    y_true = np.concatenate(all_gts)
+
 
     # Confusion matrix
-    conf_mat = confusion_matrix(y_true, y_pred, labels=list(range(num_classes)))
-    print("\nConfusion Matrix:\n", conf_mat)
+
+    print("\nConfusion Matrix:\n", conf_mat_total)
 
     # Global accuracy
-    global_acc = np.sum(np.diag(conf_mat)) / np.sum(conf_mat)
+    global_acc = np.sum(np.diag(conf_mat_total)) / np.sum(conf_mat_total)
     print(f"\nGlobal Accuracy: {global_acc:.4f}")
 
     # Per-class accuracy
-    per_class_acc = np.diag(conf_mat) / (conf_mat.sum(axis=1) + 1e-8)
+    per_class_acc = np.diag(conf_mat_total) / (conf_mat_total.sum(axis=1) + 1e-8)
     for idx, acc in enumerate(per_class_acc):
         print(f"Class {idx} Accuracy: {acc:.4f}")
+
+    # Per-class DICE coefficient
+    TP = np.diag(conf_mat_total)
+    FP = conf_mat_total.sum(axis=0) - TP
+    FN = conf_mat_total.sum(axis=1) - TP
+
+    dice_per_class = (2 * TP) / (2 * TP + FP + FN + 1e-8)
 
     # Save metrics to CSV
     output_dir = "./evaluation_results"
     os.makedirs(output_dir, exist_ok=True)
 
     # Save confusion matrix
-    conf_df = pd.DataFrame(conf_mat,
+    conf_df = pd.DataFrame(conf_mat_total,
                            index=[f"GT_{i}" for i in range(num_classes)],
                            columns=[f"Pred_{i}" for i in range(num_classes)])
     conf_df.to_csv(os.path.join(output_dir, "confusion_matrix.csv"))
 
     # Save global + per-class accuracy
     metrics = {
-        "Metric": ["Global Accuracy"] + [f"Class {i} Accuracy" for i in range(num_classes)],
-        "Value": [global_acc] + per_class_acc.tolist()
+        "Metric": ["Global Accuracy"] + [f"Class {i} Accuracy" for i in range(num_classes)] + [f"Class {i} Dice" for i
+                                                                                               in range(num_classes)],
+        "Value": [global_acc] + per_class_acc.tolist() + dice_per_class.tolist()
     }
     metrics_df = pd.DataFrame(metrics)
-    metrics_df.to_csv(os.path.join(output_dir, "accuracy_metrics.csv"), index=False)
+    metrics_df.to_csv(os.path.join(output_dir, "accuracy_metrics.csv"), index=False, float_format="%.4f")
+
 
 if __name__ == '__main__':
     main()
