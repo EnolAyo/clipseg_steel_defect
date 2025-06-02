@@ -64,7 +64,9 @@ class SeverstalDataset(Dataset):
 
     def __getitem__(self, idx):
         if self.split in ['train', 'val']:
-            query_class = random.choice(self.category_ids)
+            weights = [1, 2, 2, 2, 2]
+            query_class = np.random.choice(self.category_ids, p=np.array(weights) / sum(weights))
+            #query_class = random.choice(self.category_ids)
             query_images = self.split_class_to_image_ids[query_class]
             if not query_images:
                 return self.__getitem__(idx)  # Retry if no data for class in split

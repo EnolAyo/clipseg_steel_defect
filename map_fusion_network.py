@@ -14,11 +14,11 @@ class MapFusion(nn.Module):
 
 
         self.fusion_net = nn.Sequential(
-            nn.Conv2d(num_classes, 32, kernel_size=7, padding=1),
+            nn.Conv2d(num_classes, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
 
-            nn.Conv2d(32, 64, kernel_size=7, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.Conv2d(64, num_classes, kernel_size=1)
@@ -33,6 +33,7 @@ class MapFusion(nn.Module):
             output_maps = []
             text_prompt = defects_description[class_id]
             text_weights = torch.rand(1).cuda()
+            text_weights = 0.5
             text_cond = self.clipseg_model.compute_conditional(text_prompt)
 
             for visual_prompt in support:

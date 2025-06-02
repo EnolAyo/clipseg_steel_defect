@@ -12,7 +12,7 @@ import pandas as pd
 
 def main():
 
-    weights_path = './weights/severstal/fusion_model_epoch_30.pth'
+    weights_path = './weights/severstal_v2/fusion_model_epoch_100.pth'
     batch_size = 16
     json_path = './Severstal/annotations_COCO.json'
     image_dir = './Severstal/train_subimages'
@@ -97,7 +97,7 @@ def main():
     conf_df = pd.DataFrame(conf_mat_total,
                            index=[f"GT_{i}" for i in range(num_classes)],
                            columns=[f"Pred_{i}" for i in range(num_classes)])
-    conf_df.to_csv(os.path.join(output_dir, "confusion_matrix.csv"))
+    conf_df.to_csv(os.path.join(output_dir, "confusion_matrix_v2.csv"))
 
     # Save global + per-class accuracy
     metrics = {
@@ -106,7 +106,7 @@ def main():
         "Value": [global_acc] + per_class_acc.tolist() + dice_per_class.tolist()
     }
     metrics_df = pd.DataFrame(metrics)
-    metrics_df.to_csv(os.path.join(output_dir, "accuracy_metrics.csv"), index=False, float_format="%.4f")
+    metrics_df.to_csv(os.path.join(output_dir, "accuracy_metrics_v2.csv"), index=False, float_format="%.4f")
 
 
 if __name__ == '__main__':

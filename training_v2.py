@@ -15,7 +15,7 @@ def read_yaml(filepath: str) -> dict:
         return yaml.safe_load(file)
 
 def main():
-    os.makedirs('./weights/severstal', exist_ok=True)
+    #os.makedirs('./weights/severstal', exist_ok=True)
     json_path = './Severstal/annotations_COCO.json'
     image_dir = './Severstal/train_subimages'
     config_path = './experiments/severstal.yaml'
@@ -98,7 +98,7 @@ def main():
                 writer.add_scalar("loss/val", avg_val_loss, epoch)
                 print(f"[Epoch {epoch}] Validation Loss: {avg_val_loss:.4f}")
 
-            torch.save(fusion_model.state_dict(), f'./weights/severstal/fusion_model_epoch_{epoch}.pth')
+            torch.save(fusion_model.state_dict(), f'./weights/severstal_v2/fusion_model_epoch_{epoch}.pth')
             epoch += 1
 
 
