@@ -33,7 +33,7 @@ class MapFusion(nn.Module):
             output_maps = []
             text_prompt = defects_description[class_id]
             text_weights = torch.rand(1).cuda()
-            text_weights = 0.5
+            text_weights = 1
             text_cond = self.clipseg_model.compute_conditional(text_prompt)
 
             for visual_prompt in support:

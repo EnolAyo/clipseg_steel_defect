@@ -39,7 +39,7 @@ def compute_metrics_from_confusion(conf_mat):
     return results
 
 # Read confusion matrix from CSV
-conf_df = pd.read_csv('confusion_matrix_v2.csv', index_col=0)
+conf_df = pd.read_csv('confusion_matrix_only_text.csv', index_col=0)
 conf_mat_total = conf_df.values
 
 results = compute_metrics_from_confusion(conf_mat_total)
